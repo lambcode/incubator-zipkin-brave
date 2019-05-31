@@ -17,8 +17,8 @@
 package brave.jms;
 
 import brave.Span;
-import brave.sampler.Sampler;
 import javax.jms.CompletionListener;
+import javax.jms.Destination;
 import javax.jms.Message;
 import org.junit.Test;
 
@@ -27,46 +27,36 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 public class TracingCompletionListenerTest extends JmsTest {
-  @Test public void create_returns_input_on_noop() {
-    Span span = tracing.tracer().withSampler(Sampler.NEVER_SAMPLE).nextSpan();
-
-    CompletionListener delegate = mock(CompletionListener.class);
-    CompletionListener tracingCompletionListener =
-        TracingCompletionListener.create(delegate, span, current);
-
-    assertThat(tracingCompletionListener).isSameAs(delegate);
-  }
+  Destination destination = mock(Destination.class);
+  Message message = mock(Message.class);
+  CompletionListener delegate = mock(CompletionListener.class);
 
   @Test public void on_completion_should_finish_span() throws Exception {
-    Message message = mock(Message.class);
     Span span = tracing.tracer().nextSpan().start();
 
-    CompletionListener tracingCompletionListener =
-        TracingCompletionListener.create(mock(CompletionListener.class), span, current);
+    CompletionListener tracingCompletionListener = TracingCompletionListener.create(
+      delegate, jmsTracing.producerHandler, current, destination, message, span);
     tracingCompletionListener.onCompletion(message);
 
     assertThat(takeSpan()).isNotNull();
   }
 
   @Test public void on_exception_should_tag_if_exception() throws Exception {
-    Message message = mock(Message.class);
     Span span = tracing.tracer().nextSpan().start();
 
-    CompletionListener tracingCompletionListener =
-        TracingCompletionListener.create(mock(CompletionListener.class), span, current);
+    CompletionListener tracingCompletionListener = TracingCompletionListener.create(
+      delegate, jmsTracing.producerHandler, current, destination, message, span);
     tracingCompletionListener.onException(message, new Exception("Test exception"));
 
     assertThat(takeSpan().tags())
-        .containsEntry("error", "Test exception");
+      .containsEntry("error", "Test exception");
   }
 
   @Test public void on_completion_should_forward_then_finish_span() throws Exception {
-    Message message = mock(Message.class);
     Span span = tracing.tracer().nextSpan().start();
 
-    CompletionListener delegate = mock(CompletionListener.class);
-    CompletionListener tracingCompletionListener =
-        TracingCompletionListener.create(delegate, span, current);
+    CompletionListener tracingCompletionListener = TracingCompletionListener.create(
+      delegate, jmsTracing.producerHandler, current, destination, message, span);
     tracingCompletionListener.onCompletion(message);
 
     verify(delegate).onCompletion(message);
@@ -74,7 +64,6 @@ public class TracingCompletionListenerTest extends JmsTest {
   }
 
   @Test public void on_completion_should_have_span_in_scope() throws Exception {
-    Message message = mock(Message.class);
     Span span = tracing.tracer().nextSpan().start();
 
     CompletionListener delegate = new CompletionListener() {
@@ -87,23 +76,25 @@ public class TracingCompletionListenerTest extends JmsTest {
       }
     };
 
-    TracingCompletionListener.create(delegate, span, current).onCompletion(message);
+    CompletionListener tracingCompletionListener = TracingCompletionListener.create(
+      delegate, jmsTracing.producerHandler, current, destination, message, span);
+
+    tracingCompletionListener.onCompletion(message);
 
     takeSpan(); // consumer reported span
   }
 
   @Test public void on_exception_should_forward_then_tag() throws Exception {
-    Message message = mock(Message.class);
     Span span = tracing.tracer().nextSpan().start();
 
-    CompletionListener delegate = mock(CompletionListener.class);
-    CompletionListener tracingCompletionListener =
-        TracingCompletionListener.create(delegate, span, current);
+    CompletionListener tracingCompletionListener = TracingCompletionListener.create(
+      delegate, jmsTracing.producerHandler, current, destination, message, span);
+
     Exception e = new Exception("Test exception");
     tracingCompletionListener.onException(message, e);
 
     verify(delegate).onException(message, e);
     assertThat(takeSpan().tags())
-        .containsEntry("error", "Test exception");
+      .containsEntry("error", "Test exception");
   }
 }
