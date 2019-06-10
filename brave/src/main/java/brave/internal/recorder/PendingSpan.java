@@ -23,6 +23,7 @@ public final class PendingSpan {
   final MutableSpan state;
   final TickClock clock;
   volatile Throwable caller;
+  boolean isCleanedUp;
 
   PendingSpan(MutableSpan state, TickClock clock) {
     this.state = state;

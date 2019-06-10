@@ -111,11 +111,12 @@ public class PendingSpansTest {
   }
 
   @Test
-  public void remove_clearsReference() {
+  public void remove_marksAsCleanedUp() throws InterruptedException {
     pendingSpans.getOrCreate(context, false);
     pendingSpans.remove(context);
 
-    assertThat(pendingSpans.delegate).isEmpty();
+    assertThat(pendingSpans.delegate).hasSize(1);
+    assertThat(pendingSpans.delegate.values()).extracting(x -> x.isCleanedUp).doesNotContain(false);
     assertThat(pendingSpans.poll()).isNull();
   }
 
@@ -123,6 +124,16 @@ public class PendingSpansTest {
   public void remove_doesntReport() {
     pendingSpans.getOrCreate(context, false);
     pendingSpans.remove(context);
+
+    assertThat(spans).isEmpty();
+  }
+
+  @Test
+  public void remove_doesntReportForMultipleRegistrations() throws InterruptedException {
+    pendingSpans.getOrCreate(context, false);
+    pendingSpans.remove(context);
+    pendingSpans.getOrCreate(context, false);
+    blockOnGC();
 
     assertThat(spans).isEmpty();
   }
@@ -147,8 +158,10 @@ public class PendingSpansTest {
 
     pendingSpans.remove(context1);
 
-    assertThat(pendingSpans.delegate.keySet()).extracting(o -> ((Reference) o).get())
-        .containsOnly(context2);
+    assertThat(pendingSpans.delegate.entrySet()).filteredOn(e -> ((Reference)e.getKey()).get().equals(context1)).extracting(e -> e.getValue().isCleanedUp).hasSize(1);
+    assertThat(pendingSpans.delegate.entrySet()).filteredOn(e -> ((Reference)e.getKey()).get().equals(context1)).extracting(e -> e.getValue().isCleanedUp).doesNotContain(false);
+    assertThat(pendingSpans.delegate.entrySet()).filteredOn(e -> ((Reference)e.getKey()).get().equals(context2)).extracting(e -> e.getValue().isCleanedUp).hasSize(1);
+    assertThat(pendingSpans.delegate.entrySet()).filteredOn(e -> ((Reference)e.getKey()).get().equals(context2)).extracting(e -> e.getValue().isCleanedUp).doesNotContain(true);
   }
 
   /** mainly ensures internals aren't dodgy on null */

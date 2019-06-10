@@ -110,7 +110,8 @@ public final class PendingSpans extends ReferenceQueue<TraceContext> {
   /** @see brave.Span#abandon() */
   public boolean remove(TraceContext context) {
     if (context == null) throw new NullPointerException("context == null");
-    PendingSpan last = delegate.remove(context);
+    PendingSpan last = delegate.get(context);
+    if (last != null) last.isCleanedUp = true;
     reportOrphanedSpans(); // also clears the reference relating to the recent remove
     return last != null;
   }
@@ -126,7 +127,7 @@ public final class PendingSpans extends ReferenceQueue<TraceContext> {
     boolean noop = zipkinHandler == FinishedSpanHandler.NOOP || this.noop.get();
     while ((contextKey = (RealKey) poll()) != null) {
       PendingSpan value = delegate.remove(contextKey);
-      if (noop || value == null || !contextKey.sampled) continue;
+      if (noop || value == null || value.isCleanedUp || !contextKey.sampled) continue;
       if (flushTime == 0L) flushTime = clock.currentTimeMicroseconds();
 
       TraceContext context = InternalPropagation.instance.newTraceContext(
