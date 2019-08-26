@@ -23,6 +23,7 @@ import brave.propagation.TraceContext;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -133,7 +134,7 @@ public final class PendingSpans extends ReferenceQueue<TraceContext> {
         InternalPropagation.FLAG_SAMPLED_SET | InternalPropagation.FLAG_SAMPLED,
         contextKey.traceIdHigh, contextKey.traceId,
         contextKey.localRootId, 0L, contextKey.spanId,
-        caller != null && !isEmpty ? Collections.singletonList(caller) : Collections.emptyList()
+        contextKey.extra
       );
 
       if (caller != null) {
@@ -167,6 +168,7 @@ public final class PendingSpans extends ReferenceQueue<TraceContext> {
     // Copy the identity fields from the trace context, so we can use them when the reference clears
     final long traceIdHigh, traceId, localRootId, spanId;
     final boolean sampled;
+    final List<Object> extra;
 
     RealKey(TraceContext context, ReferenceQueue<TraceContext> queue) {
       super(context, queue);
@@ -176,6 +178,7 @@ public final class PendingSpans extends ReferenceQueue<TraceContext> {
       localRootId = context.localRootId();
       spanId = context.spanId();
       sampled = Boolean.TRUE.equals(context.sampled());
+      extra = context.extra();
     }
 
     @Override public String toString() {
